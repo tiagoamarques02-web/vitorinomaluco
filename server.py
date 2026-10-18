@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify
-import os
 
 app = Flask(__name__)
 
@@ -15,8 +14,7 @@ def webhook():
     action = data.get("action")
     symbol = data.get("symbol")
 
-    print(f"ACTION={action}")
-    print(f"SYMBOL={symbol}")
+    print(f"RECEBIDO: {action} {symbol}")
 
     return jsonify({
         "success": True,
