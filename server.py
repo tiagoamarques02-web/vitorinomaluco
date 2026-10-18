@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+import os
 
 app = Flask(__name__)
 
@@ -11,11 +12,16 @@ def webhook():
 
     data = request.get_json(force=True)
 
-    print("Recebido:", data)
+    action = data.get("action")
+    symbol = data.get("symbol")
+
+    print(f"ACTION={action}")
+    print(f"SYMBOL={symbol}")
 
     return jsonify({
         "success": True,
-        "data": data
+        "action": action,
+        "symbol": symbol
     })
 
 if __name__ == "__main__":
