@@ -1,25 +1,35 @@
-from flask import Flask
-import os
-import requests
+from flask import Flask, request, jsonify
+from datetime import datetime
 
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-
     return {
-        "api_key": bool(os.getenv("BITGET_API_KEY")),
-        "secret": bool(os.getenv("BITGET_API_SECRET")),
-        "passphrase": bool(os.getenv("BITGET_PASSPHRASE"))
+        "status": "MONSTER V4 PAPER TRADING"
     }
 
-@app.route("/bitget-test")
-def bitget_test():
+@app.route("/webhook", methods=["POST"])
+def webhook():
 
-    return {
-        "status": "api_loaded",
-        "api_key": os.getenv("BITGET_API_KEY")[:8] + "..."
-    }
+    data = request.get_json(force=True)
+
+    action = data.get("action")
+    symbol = data.get("symbol")
+
+    print(
+        f"[{datetime.now()}] "
+        f"ACTION={action} "
+        f"SYMBOL={symbol}",
+        flush=True
+    )
+
+    return jsonify({
+        "success": True,
+        "action": action,
+        "symbol": symbol,
+        "mode": "paper"
+    })
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
