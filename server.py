@@ -1,26 +1,20 @@
-from flask import Flask, request, jsonify
+from flask import Flask
+import os
 
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "MONSTER V4 ONLINE"
 
-@app.route("/webhook", methods=["POST"])
-def webhook():
+    api = os.getenv("BITGET_API_KEY")
+    secret = os.getenv("BITGET_API_SECRET")
+    passphrase = os.getenv("BITGET_PASSPHRASE")
 
-    data = request.get_json(force=True)
-
-    action = data.get("action")
-    symbol = data.get("symbol")
-
-    print(f"RECEBIDO: {action} {symbol}")
-
-    return jsonify({
-        "success": True,
-        "action": action,
-        "symbol": symbol
-    })
+    return {
+        "api_key": api is not None,
+        "secret": secret is not None,
+        "passphrase": passphrase is not None
+    }
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
