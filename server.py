@@ -1,12 +1,6 @@
 from flask import Flask, request, jsonify
 from datetime import datetime
-import hashlib
-import hmac
-import base64
-import json
-import time
 import os
-import requests
 
 app = Flask(__name__)
 
@@ -18,116 +12,30 @@ API_KEY = os.getenv("BITGET_API_KEY")
 API_SECRET = os.getenv("BITGET_API_SECRET")
 PASSPHRASE = os.getenv("BITGET_PASSPHRASE")
 
-BASE_URL = "https://api.bitget.com"
-
-POSITION_SIZE_USDT = 5
-LEVERAGE = 3
-
 # =====================================================
-# SIGNATURE
-# =====================================================
-
-def sign(timestamp, method, request_path, body=""):
-
-    message = f"{timestamp}{method}{request_path}{body}"
-
-    return base64.b64encode(
-        hmac.new(
-            API_SECRET.encode("utf-8"),
-            message.encode("utf-8"),
-            hashlib.sha256
-        ).digest()
-    ).decode()
-
-# =====================================================
-# HEADERS
-# =====================================================
-
-def headers(method, path, body=""):
-
-    timestamp = str(int(time.time() * 1000))
-
-    return {
-        "ACCESS-KEY": API_KEY,
-        "ACCESS-SIGN": sign(timestamp, method, path, body),
-        "ACCESS-TIMESTAMP": timestamp,
-        "ACCESS-PASSPHRASE": PASSPHRASE,
-        "Content-Type": "application/json",
-        "locale": "en-US"
-    }
-
-# =====================================================
-# ABRIR POSIÇÃO
-# =====================================================
-
-def place_order(symbol, side):
-
-    path = "/api/v2/mix/order/place-order"
-
-    body = {
-        "symbol": symbol,
-        "productType": "USDT-FUTURES",
-        "marginMode": "isolated",
-        "marginCoin": "USDT",
-        "size": str(POSITION_SIZE_USDT),
-        "side": side,
-        "orderType": "market"
-    }
-
-    body_json = json.dumps(body)
-
-    response = requests.post(
-        BASE_URL + path,
-        headers=headers("POST", path, body_json),
-        data=body_json,
-        timeout=20
-    )
-
-    print(response.text, flush=True)
-
-    return response.json()
-
-# =====================================================
-# FECHAR POSIÇÃO
-# =====================================================
-
-def close_position(symbol, hold_side):
-
-    path = "/api/v2/mix/order/close-positions"
-
-    body = {
-        "symbol": symbol,
-        "productType": "USDT-FUTURES",
-        "holdSide": hold_side
-    }
-
-    body_json = json.dumps(body)
-
-    response = requests.post(
-        BASE_URL + path,
-        headers=headers("POST", path, body_json),
-        data=body_json,
-        timeout=20
-    )
-
-    print(response.text, flush=True)
-
-    return response.json()
-
-# =====================================================
-# TESTE API
+# HOME
 # =====================================================
 
 @app.route("/")
 def home():
 
     return jsonify({
-        "status": "MONSTER FINAL V9 REAL",
+        "status": "MONSTER V9 TEST MODE",
         "api_key_loaded": bool(API_KEY),
         "secret_loaded": bool(API_SECRET),
         "passphrase_loaded": bool(PASSPHRASE),
-        "position_size_usdt": POSITION_SIZE_USDT,
-        "leverage": LEVERAGE
+        "real_trading": False
+    })
+
+# =====================================================
+# HEALTH
+# =====================================================
+
+@app.route("/health")
+def health():
+
+    return jsonify({
+        "status": "ok"
     })
 
 # =====================================================
@@ -139,12 +47,12 @@ def webhook():
 
     data = request.get_json(force=True)
 
-    action = data.get("action")
-    symbol = data.get("symbol")
-    price = data.get("price")
-    timeframe = data.get("timeframe")
+    action = data.get("action", "")
+    symbol = data.get("symbol", "")
+    price = data.get("price", "")
+    timeframe = data.get("timeframe", "")
 
-    print("=" * 60, flush=True)
+    print("=" * 70, flush=True)
 
     print(
         f"[{datetime.now()}] "
@@ -155,50 +63,32 @@ def webhook():
         flush=True
     )
 
-    try:
+    if action == "LONG":
+        print("TEST MODE -> OPEN LONG", flush=True)
 
-        if action == "LONG":
+    elif action == "SHORT":
+        print("TEST MODE -> OPEN SHORT", flush=True)
 
-            close_position(symbol, "short")
-            result = place_order(symbol, "buy")
+    elif action == "EXIT_LONG":
+        print("TEST MODE -> CLOSE LONG", flush=True)
 
-        elif action == "SHORT":
+    elif action == "EXIT_SHORT":
+        print("TEST MODE -> CLOSE SHORT", flush=True)
 
-            close_position(symbol, "long")
-            result = place_order(symbol, "sell")
+    else:
+        print(f"UNKNOWN ACTION -> {action}", flush=True)
 
-        elif action == "EXIT_LONG":
+    print("=" * 70, flush=True)
 
-            result = close_position(symbol, "long")
-
-        elif action == "EXIT_SHORT":
-
-            result = close_position(symbol, "short")
-
-        else:
-
-            return jsonify({
-                "success": False,
-                "error": "unknown action"
-            }), 400
-
-        print(result, flush=True)
-
-        return jsonify({
-            "success": True,
-            "action": action,
-            "symbol": symbol,
-            "result": result
-        })
-
-    except Exception as e:
-
-        print(str(e), flush=True)
-
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+    return jsonify({
+        "success": True,
+        "mode": "test",
+        "action": action,
+        "symbol": symbol,
+        "price": price,
+        "timeframe": timeframe,
+        "timestamp": str(datetime.now())
+    })
 
 # =====================================================
 # START
