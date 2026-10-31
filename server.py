@@ -28,9 +28,10 @@ LEVERAGE = 3
 # =====================================================
 
 def sign(timestamp, method, request_path, body=""):
+
     message = f"{timestamp}{method}{request_path}{body}"
 
-    signature = base64.b64encode(
+    return base64.b64encode(
         hmac.new(
             API_SECRET.encode("utf-8"),
             message.encode("utf-8"),
@@ -38,13 +39,12 @@ def sign(timestamp, method, request_path, body=""):
         ).digest()
     ).decode()
 
-    return signature
-
 # =====================================================
 # HEADERS
 # =====================================================
 
 def headers(method, path, body=""):
+
     timestamp = str(int(time.time() * 1000))
 
     return {
@@ -57,7 +57,7 @@ def headers(method, path, body=""):
     }
 
 # =====================================================
-# ORDER
+# ABRIR POSIÇÃO
 # =====================================================
 
 def place_order(symbol, side):
@@ -80,7 +80,7 @@ def place_order(symbol, side):
         BASE_URL + path,
         headers=headers("POST", path, body_json),
         data=body_json,
-        timeout=15
+        timeout=20
     )
 
     print(response.text, flush=True)
@@ -88,7 +88,7 @@ def place_order(symbol, side):
     return response.json()
 
 # =====================================================
-# CLOSE
+# FECHAR POSIÇÃO
 # =====================================================
 
 def close_position(symbol, hold_side):
@@ -107,7 +107,7 @@ def close_position(symbol, hold_side):
         BASE_URL + path,
         headers=headers("POST", path, body_json),
         data=body_json,
-        timeout=15
+        timeout=20
     )
 
     print(response.text, flush=True)
@@ -115,18 +115,18 @@ def close_position(symbol, hold_side):
     return response.json()
 
 # =====================================================
-# HOME
+# TESTE API
 # =====================================================
 
 @app.route("/")
 def home():
 
     return jsonify({
-        "status": "MONSTER V9 REAL",
-        "api_key": bool(API_KEY),
-        "secret": bool(API_SECRET),
-        "passphrase": bool(PASSPHRASE),
-        "size_usdt": POSITION_SIZE_USDT,
+        "status": "MONSTER FINAL V9 REAL",
+        "api_key_loaded": bool(API_KEY),
+        "secret_loaded": bool(API_SECRET),
+        "passphrase_loaded": bool(PASSPHRASE),
+        "position_size_usdt": POSITION_SIZE_USDT,
         "leverage": LEVERAGE
     })
 
@@ -141,13 +141,17 @@ def webhook():
 
     action = data.get("action")
     symbol = data.get("symbol")
+    price = data.get("price")
+    timeframe = data.get("timeframe")
 
     print("=" * 60, flush=True)
 
     print(
         f"[{datetime.now()}] "
         f"ACTION={action} "
-        f"SYMBOL={symbol}",
+        f"SYMBOL={symbol} "
+        f"PRICE={price} "
+        f"TIMEFRAME={timeframe}",
         flush=True
     )
 
