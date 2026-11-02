@@ -20,7 +20,7 @@ PASSPHRASE = os.getenv("BITGET_PASSPHRASE")
 
 BASE_URL = "https://api.bitget.com"
 
-TRADE_QTY = "0.01"
+TRADE_QTY = "0.25"
 
 # =====================================================
 # SIGNATURE
