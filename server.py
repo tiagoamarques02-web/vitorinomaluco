@@ -3,6 +3,7 @@ from datetime import datetime
 import hashlib
 import hmac
 import base64
+import json
 import time
 import os
 import requests
@@ -23,11 +24,11 @@ BASE_URL = "https://api.bitget.com"
 # SIGNATURE
 # =====================================================
 
-def create_signature(timestamp, method, request_path):
+def create_signature(timestamp, method, request_path, body=""):
 
-    message = f"{timestamp}{method}{request_path}"
+    message = f"{timestamp}{method}{request_path}{body}"
 
-    signature = base64.b64encode(
+    return base64.b64encode(
         hmac.new(
             API_SECRET.encode("utf-8"),
             message.encode("utf-8"),
@@ -35,22 +36,21 @@ def create_signature(timestamp, method, request_path):
         ).digest()
     ).decode()
 
-    return signature
-
 # =====================================================
 # HEADERS
 # =====================================================
 
-def get_headers(method, path):
+def get_headers(method, path, body=""):
 
     timestamp = str(int(time.time() * 1000))
 
     return {
         "ACCESS-KEY": API_KEY,
-        "ACCESS-SIGN": create_signature(timestamp, method, path),
+        "ACCESS-SIGN": create_signature(timestamp, method, path, body),
         "ACCESS-TIMESTAMP": timestamp,
         "ACCESS-PASSPHRASE": PASSPHRASE,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "locale": "en-US"
     }
 
 # =====================================================
@@ -61,21 +61,7 @@ def get_headers(method, path):
 def home():
 
     return jsonify({
-        "status": "MONSTER UTA TEST",
-        "api_key": bool(API_KEY),
-        "secret": bool(API_SECRET),
-        "passphrase": bool(PASSPHRASE)
-    })
-
-# =====================================================
-# UTA TEST
-# =====================================================
-
-@app.route("/uta-test")
-def uta_test():
-
-    return jsonify({
-        "status": "uta-test-ok",
+        "status": "MONSTER UTA V3 TEST",
         "api_key": bool(API_KEY),
         "secret": bool(API_SECRET),
         "passphrase": bool(PASSPHRASE)
@@ -95,6 +81,42 @@ def uta_positions():
         response = requests.get(
             BASE_URL + path,
             headers=get_headers("GET", path),
+            timeout=20
+        )
+
+        return jsonify(response.json())
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+# =====================================================
+# MAX OPEN AVAILABLE
+# =====================================================
+
+@app.route("/max-open")
+def max_open():
+
+    try:
+
+        path = "/api/v3/account/max-open-available"
+
+        body = {
+            "category": "USDT-FUTURES",
+            "symbol": "ZECUSDT",
+            "orderType": "market",
+            "side": "buy"
+        }
+
+        body_json = json.dumps(body)
+
+        response = requests.post(
+            BASE_URL + path,
+            headers=get_headers("POST", path, body_json),
+            data=body_json,
             timeout=20
         )
 
@@ -129,7 +151,7 @@ def webhook():
     price = data.get("price")
     timeframe = data.get("timeframe")
 
-    print("=" * 60, flush=True)
+    print("=" * 70, flush=True)
 
     print(
         f"[{datetime.now()}] "
@@ -140,7 +162,7 @@ def webhook():
         flush=True
     )
 
-    print("=" * 60, flush=True)
+    print("=" * 70, flush=True)
 
     return jsonify({
         "success": True,
