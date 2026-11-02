@@ -20,6 +20,8 @@ PASSPHRASE = os.getenv("BITGET_PASSPHRASE")
 
 BASE_URL = "https://api.bitget.com"
 
+TRADE_QTY = "0.01"
+
 # =====================================================
 # SIGNATURE
 # =====================================================
@@ -54,6 +56,74 @@ def get_headers(method, path, body=""):
     }
 
 # =====================================================
+# PLACE ORDER
+# =====================================================
+
+def place_order(symbol, side):
+
+    path = "/api/v3/trade/place-order"
+
+    body = {
+        "category": "USDT-FUTURES",
+        "symbol": symbol,
+        "side": side,
+        "orderType": "market",
+        "qty": TRADE_QTY
+    }
+
+    body_json = json.dumps(body)
+
+    response = requests.post(
+        BASE_URL + path,
+        headers=get_headers("POST", path, body_json),
+        data=body_json,
+        timeout=20
+    )
+
+    return response.json()
+
+# =====================================================
+# CLOSE POSITION
+# =====================================================
+
+def close_position(symbol, pos_side):
+
+    path = "/api/v3/trade/close-positions"
+
+    body = {
+        "category": "USDT-FUTURES",
+        "symbol": symbol,
+        "posSide": pos_side
+    }
+
+    body_json = json.dumps(body)
+
+    response = requests.post(
+        BASE_URL + path,
+        headers=get_headers("POST", path, body_json),
+        data=body_json,
+        timeout=20
+    )
+
+    return response.json()
+
+# =====================================================
+# CURRENT POSITIONS
+# =====================================================
+
+def get_positions():
+
+    path = "/api/v3/position/current-position?category=USDT-FUTURES"
+
+    response = requests.get(
+        BASE_URL + path,
+        headers=get_headers("GET", path),
+        timeout=20
+    )
+
+    return response.json()
+
+# =====================================================
 # HOME
 # =====================================================
 
@@ -61,24 +131,11 @@ def get_headers(method, path, body=""):
 def home():
 
     return jsonify({
-        "status": "MONSTER UTA V3 TEST",
+        "status": "MONSTER UTA V3 LIVE",
         "api_key": bool(API_KEY),
         "secret": bool(API_SECRET),
-        "passphrase": bool(PASSPHRASE)
-    })
-
-# =====================================================
-# UTA TEST
-# =====================================================
-
-@app.route("/uta-test")
-def uta_test():
-
-    return jsonify({
-        "status": "uta-test-ok",
-        "api_key": bool(API_KEY),
-        "secret": bool(API_SECRET),
-        "passphrase": bool(PASSPHRASE)
+        "passphrase": bool(PASSPHRASE),
+        "trade_qty": TRADE_QTY
     })
 
 # =====================================================
@@ -89,52 +146,7 @@ def uta_test():
 def uta_positions():
 
     try:
-
-        path = "/api/v3/position/current-position?category=USDT-FUTURES"
-
-        response = requests.get(
-            BASE_URL + path,
-            headers=get_headers("GET", path),
-            timeout=20
-        )
-
-        return jsonify(response.json())
-
-    except Exception as e:
-
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
-# =====================================================
-# MAX OPEN
-# =====================================================
-
-@app.route("/max-open")
-def max_open():
-
-    try:
-
-        path = "/api/v3/account/max-open-available"
-
-        body = {
-            "category": "USDT-FUTURES",
-            "symbol": "ZECUSDT",
-            "orderType": "market",
-            "side": "buy"
-        }
-
-        body_json = json.dumps(body)
-
-        response = requests.post(
-            BASE_URL + path,
-            headers=get_headers("POST", path, body_json),
-            data=body_json,
-            timeout=20
-        )
-
-        return jsonify(response.json())
+        return jsonify(get_positions())
 
     except Exception as e:
 
@@ -152,26 +164,12 @@ def uta_buy_test():
 
     try:
 
-        path = "/api/v3/trade/place-order"
-
-        body = {
-            "category": "USDT-FUTURES",
-            "symbol": "ZECUSDT",
-            "side": "buy",
-            "orderType": "market",
-            "qty": "0.01"
-        }
-
-        body_json = json.dumps(body)
-
-        response = requests.post(
-            BASE_URL + path,
-            headers=get_headers("POST", path, body_json),
-            data=body_json,
-            timeout=20
+        result = place_order(
+            symbol="ZECUSDT",
+            side="buy"
         )
 
-        return jsonify(response.json())
+        return jsonify(result)
 
     except Exception as e:
 
@@ -189,26 +187,12 @@ def uta_sell_test():
 
     try:
 
-        path = "/api/v3/trade/place-order"
-
-        body = {
-            "category": "USDT-FUTURES",
-            "symbol": "ZECUSDT",
-            "side": "sell",
-            "orderType": "market",
-            "qty": "0.01"
-        }
-
-        body_json = json.dumps(body)
-
-        response = requests.post(
-            BASE_URL + path,
-            headers=get_headers("POST", path, body_json),
-            data=body_json,
-            timeout=20
+        result = place_order(
+            symbol="ZECUSDT",
+            side="sell"
         )
 
-        return jsonify(response.json())
+        return jsonify(result)
 
     except Exception as e:
 
@@ -226,24 +210,12 @@ def uta_close_long():
 
     try:
 
-        path = "/api/v3/trade/close-positions"
-
-        body = {
-            "category": "USDT-FUTURES",
-            "symbol": "ZECUSDT",
-            "posSide": "long"
-        }
-
-        body_json = json.dumps(body)
-
-        response = requests.post(
-            BASE_URL + path,
-            headers=get_headers("POST", path, body_json),
-            data=body_json,
-            timeout=20
+        result = close_position(
+            symbol="ZECUSDT",
+            pos_side="long"
         )
 
-        return jsonify(response.json())
+        return jsonify(result)
 
     except Exception as e:
 
@@ -261,24 +233,12 @@ def uta_close_short():
 
     try:
 
-        path = "/api/v3/trade/close-positions"
-
-        body = {
-            "category": "USDT-FUTURES",
-            "symbol": "ZECUSDT",
-            "posSide": "short"
-        }
-
-        body_json = json.dumps(body)
-
-        response = requests.post(
-            BASE_URL + path,
-            headers=get_headers("POST", path, body_json),
-            data=body_json,
-            timeout=20
+        result = close_position(
+            symbol="ZECUSDT",
+            pos_side="short"
         )
 
-        return jsonify(response.json())
+        return jsonify(result)
 
     except Exception as e:
 
@@ -288,7 +248,7 @@ def uta_close_short():
         }), 500
 
 # =====================================================
-# WEBHOOK
+# TRADINGVIEW WEBHOOK
 # =====================================================
 
 @app.route("/webhook", methods=["POST"])
@@ -320,15 +280,62 @@ def webhook():
         flush=True
     )
 
-    print("=" * 70, flush=True)
+    try:
 
-    return jsonify({
-        "success": True,
-        "action": action,
-        "symbol": symbol,
-        "price": price,
-        "timeframe": timeframe
-    })
+        if action == "LONG":
+
+            result = place_order(
+                symbol=symbol,
+                side="buy"
+            )
+
+        elif action == "SHORT":
+
+            result = place_order(
+                symbol=symbol,
+                side="sell"
+            )
+
+        elif action == "EXIT_LONG":
+
+            result = close_position(
+                symbol=symbol,
+                pos_side="long"
+            )
+
+        elif action == "EXIT_SHORT":
+
+            result = close_position(
+                symbol=symbol,
+                pos_side="short"
+            )
+
+        else:
+
+            return jsonify({
+                "success": False,
+                "error": "unknown action"
+            }), 400
+
+        print(result, flush=True)
+
+        print("=" * 70, flush=True)
+
+        return jsonify({
+            "success": True,
+            "action": action,
+            "symbol": symbol,
+            "result": result
+        })
+
+    except Exception as e:
+
+        print(str(e), flush=True)
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 # =====================================================
 # START
