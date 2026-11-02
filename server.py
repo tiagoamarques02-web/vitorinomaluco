@@ -68,6 +68,20 @@ def home():
     })
 
 # =====================================================
+# UTA TEST
+# =====================================================
+
+@app.route("/uta-test")
+def uta_test():
+
+    return jsonify({
+        "status": "uta-test-ok",
+        "api_key": bool(API_KEY),
+        "secret": bool(API_SECRET),
+        "passphrase": bool(PASSPHRASE)
+    })
+
+# =====================================================
 # POSITIONS
 # =====================================================
 
@@ -94,7 +108,7 @@ def uta_positions():
         }), 500
 
 # =====================================================
-# MAX OPEN AVAILABLE
+# MAX OPEN
 # =====================================================
 
 @app.route("/max-open")
@@ -109,6 +123,150 @@ def max_open():
             "symbol": "ZECUSDT",
             "orderType": "market",
             "side": "buy"
+        }
+
+        body_json = json.dumps(body)
+
+        response = requests.post(
+            BASE_URL + path,
+            headers=get_headers("POST", path, body_json),
+            data=body_json,
+            timeout=20
+        )
+
+        return jsonify(response.json())
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+# =====================================================
+# BUY TEST
+# =====================================================
+
+@app.route("/uta-buy-test")
+def uta_buy_test():
+
+    try:
+
+        path = "/api/v3/trade/place-order"
+
+        body = {
+            "category": "USDT-FUTURES",
+            "symbol": "ZECUSDT",
+            "side": "buy",
+            "orderType": "market",
+            "qty": "0.01"
+        }
+
+        body_json = json.dumps(body)
+
+        response = requests.post(
+            BASE_URL + path,
+            headers=get_headers("POST", path, body_json),
+            data=body_json,
+            timeout=20
+        )
+
+        return jsonify(response.json())
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+# =====================================================
+# SELL TEST
+# =====================================================
+
+@app.route("/uta-sell-test")
+def uta_sell_test():
+
+    try:
+
+        path = "/api/v3/trade/place-order"
+
+        body = {
+            "category": "USDT-FUTURES",
+            "symbol": "ZECUSDT",
+            "side": "sell",
+            "orderType": "market",
+            "qty": "0.01"
+        }
+
+        body_json = json.dumps(body)
+
+        response = requests.post(
+            BASE_URL + path,
+            headers=get_headers("POST", path, body_json),
+            data=body_json,
+            timeout=20
+        )
+
+        return jsonify(response.json())
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+# =====================================================
+# CLOSE LONG TEST
+# =====================================================
+
+@app.route("/uta-close-long")
+def uta_close_long():
+
+    try:
+
+        path = "/api/v3/trade/close-positions"
+
+        body = {
+            "category": "USDT-FUTURES",
+            "symbol": "ZECUSDT",
+            "posSide": "long"
+        }
+
+        body_json = json.dumps(body)
+
+        response = requests.post(
+            BASE_URL + path,
+            headers=get_headers("POST", path, body_json),
+            data=body_json,
+            timeout=20
+        )
+
+        return jsonify(response.json())
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+# =====================================================
+# CLOSE SHORT TEST
+# =====================================================
+
+@app.route("/uta-close-short")
+def uta_close_short():
+
+    try:
+
+        path = "/api/v3/trade/close-positions"
+
+        body = {
+            "category": "USDT-FUTURES",
+            "symbol": "ZECUSDT",
+            "posSide": "short"
         }
 
         body_json = json.dumps(body)
@@ -167,7 +325,9 @@ def webhook():
     return jsonify({
         "success": True,
         "action": action,
-        "symbol": symbol
+        "symbol": symbol,
+        "price": price,
+        "timeframe": timeframe
     })
 
 # =====================================================
