@@ -3,27 +3,37 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-@app.route("/webhook", methods=["POST"])
-def webhook():
+@app.route("/uta-test")
+def uta_test():
 
-    data = request.get_json(silent=True)
+    path = "/api/v3/position/current-position"
 
-    if not data:
-        print("IGNORED EMPTY PAYLOAD", flush=True)
-        return jsonify({"ignored": True}), 200
+    params = "?category=USDT-FUTURES"
 
-    action = data.get("action")
-    symbol = data.get("symbol")
+    timestamp = str(int(time.time() * 1000))
 
-    if not action or not symbol:
-        print(f"INVALID PAYLOAD: {data}", flush=True)
-        return jsonify({"ignored": True}), 200
+    sign_message = timestamp + "GET" + path + params
 
-    print(
-        f"[{datetime.now()}] "
-        f"ACTION={action} "
-        f"SYMBOL={symbol}",
-        flush=True
+    signature = base64.b64encode(
+        hmac.new(
+            API_SECRET.encode(),
+            sign_message.encode(),
+            hashlib.sha256
+        ).digest()
+    ).decode()
+
+    headers = {
+        "ACCESS-KEY": API_KEY,
+        "ACCESS-SIGN": signature,
+        "ACCESS-TIMESTAMP": timestamp,
+        "ACCESS-PASSPHRASE": PASSPHRASE,
+        "Content-Type": "application/json"
+    }
+
+    response = requests.get(
+        BASE_URL + path + params,
+        headers=headers,
+        timeout=20
     )
 
-    return jsonify({"success": True})
+    return jsonify(response.json())
