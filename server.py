@@ -20,9 +20,7 @@ PASSPHRASE = os.getenv("BITGET_PASSPHRASE")
 
 BASE_URL = "https://api.bitget.com"
 
-TRADE_QTY = "0.10"
-
-CURRENT_POSITION = "FLAT"
+TRADE_QTY = "0.01"
 
 # =====================================================
 # SIGNATURE
@@ -56,6 +54,65 @@ def get_headers(method, path, body=""):
         "Content-Type": "application/json",
         "locale": "en-US"
     }
+
+# =====================================================
+# POSIÇÃO REAL
+# =====================================================
+
+def get_real_position(symbol):
+
+    try:
+
+        path = (
+            "/api/v3/position/current-position"
+            f"?category=USDT-FUTURES&symbol={symbol}"
+        )
+
+        response = requests.get(
+            BASE_URL + path,
+            headers=get_headers("GET", path),
+            timeout=20
+        )
+
+        data = response.json()
+
+        positions = (
+            data.get("data", {})
+                .get("list")
+        )
+
+        if not positions:
+            return "FLAT"
+
+        for pos in positions:
+
+            side = str(
+                pos.get("posSide", "")
+            ).lower()
+
+            qty = float(
+                pos.get("total", "0")
+            )
+
+            if qty <= 0:
+                continue
+
+            if side == "long":
+                return "LONG"
+
+            if side == "short":
+                return "SHORT"
+
+        return "FLAT"
+
+    except Exception as e:
+
+        print(
+            f"POSITION ERROR: {e}",
+            flush=True
+        )
+
+        return "FLAT"
 
 # =====================================================
 # PLACE ORDER
@@ -110,20 +167,30 @@ def close_position(symbol, pos_side):
     return response.json()
 
 # =====================================================
-# GET POSITIONS
+# POSITIONS ENDPOINT
 # =====================================================
 
-def get_positions():
+@app.route("/uta-positions")
+def uta_positions():
 
-    path = "/api/v3/position/current-position?category=USDT-FUTURES"
+    try:
 
-    response = requests.get(
-        BASE_URL + path,
-        headers=get_headers("GET", path),
-        timeout=20
-    )
+        path = "/api/v3/position/current-position?category=USDT-FUTURES"
 
-    return response.json()
+        response = requests.get(
+            BASE_URL + path,
+            headers=get_headers("GET", path),
+            timeout=20
+        )
+
+        return jsonify(response.json())
+
+    except Exception as e:
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 # =====================================================
 # HOME
@@ -134,29 +201,11 @@ def home():
 
     return jsonify({
         "status": "MONSTER UTA V3 LIVE",
+        "trade_qty": TRADE_QTY,
         "api_key": bool(API_KEY),
         "secret": bool(API_SECRET),
-        "passphrase": bool(PASSPHRASE),
-        "trade_qty": TRADE_QTY,
-        "current_position": CURRENT_POSITION
+        "passphrase": bool(PASSPHRASE)
     })
-
-# =====================================================
-# POSITIONS
-# =====================================================
-
-@app.route("/uta-positions")
-def uta_positions():
-
-    try:
-        return jsonify(get_positions())
-
-    except Exception as e:
-
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
 
 # =====================================================
 # WEBHOOK
@@ -165,13 +214,14 @@ def uta_positions():
 @app.route("/webhook", methods=["POST"])
 def webhook():
 
-    global CURRENT_POSITION
-
     data = request.get_json(silent=True)
 
     if not data:
 
-        print("IGNORED EMPTY PAYLOAD", flush=True)
+        print(
+            "IGNORED EMPTY PAYLOAD",
+            flush=True
+        )
 
         return jsonify({
             "ignored": True
@@ -180,25 +230,27 @@ def webhook():
     action = data.get("action")
     symbol = data.get("symbol")
 
+    current_position = get_real_position(symbol)
+
     print("=" * 80, flush=True)
 
     print(
         f"[{datetime.now()}] "
         f"ACTION={action} "
         f"SYMBOL={symbol} "
-        f"CURRENT_POSITION={CURRENT_POSITION}",
+        f"REAL_POSITION={current_position}",
         flush=True
     )
 
     try:
 
-        # =====================================================
+        # ==========================================
         # LONG
-        # =====================================================
+        # ==========================================
 
         if action == "LONG":
 
-            if CURRENT_POSITION == "LONG":
+            if current_position == "LONG":
 
                 return jsonify({
                     "ignored": True,
@@ -210,15 +262,13 @@ def webhook():
                 side="buy"
             )
 
-            CURRENT_POSITION = "LONG"
-
-        # =====================================================
+        # ==========================================
         # SHORT
-        # =====================================================
+        # ==========================================
 
         elif action == "SHORT":
 
-            if CURRENT_POSITION == "SHORT":
+            if current_position == "SHORT":
 
                 return jsonify({
                     "ignored": True,
@@ -230,15 +280,13 @@ def webhook():
                 side="sell"
             )
 
-            CURRENT_POSITION = "SHORT"
-
-        # =====================================================
+        # ==========================================
         # EXIT LONG
-        # =====================================================
+        # ==========================================
 
         elif action == "EXIT_LONG":
 
-            if CURRENT_POSITION != "LONG":
+            if current_position != "LONG":
 
                 return jsonify({
                     "ignored": True,
@@ -250,15 +298,13 @@ def webhook():
                 pos_side="long"
             )
 
-            CURRENT_POSITION = "FLAT"
-
-        # =====================================================
+        # ==========================================
         # EXIT SHORT
-        # =====================================================
+        # ==========================================
 
         elif action == "EXIT_SHORT":
 
-            if CURRENT_POSITION != "SHORT":
+            if current_position != "SHORT":
 
                 return jsonify({
                     "ignored": True,
@@ -270,8 +316,6 @@ def webhook():
                 pos_side="short"
             )
 
-            CURRENT_POSITION = "FLAT"
-
         else:
 
             return jsonify({
@@ -281,24 +325,22 @@ def webhook():
 
         print(result, flush=True)
 
-        print(
-            f"NEW_POSITION={CURRENT_POSITION}",
-            flush=True
-        )
-
         print("=" * 80, flush=True)
 
         return jsonify({
             "success": True,
             "action": action,
             "symbol": symbol,
-            "position": CURRENT_POSITION,
+            "real_position_before": current_position,
             "result": result
         })
 
     except Exception as e:
 
-        print(str(e), flush=True)
+        print(
+            f"ERROR: {e}",
+            flush=True
+        )
 
         return jsonify({
             "success": False,
@@ -310,4 +352,7 @@ def webhook():
 # =====================================================
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    app.run(
+        host="0.0.0.0",
+        port=8080
+    )
