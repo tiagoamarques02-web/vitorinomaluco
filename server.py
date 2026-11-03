@@ -26,17 +26,19 @@ TRADE_QTY = "0.01"
 # SIGNATURE
 # =====================================================
 
-def create_signature(timestamp, method, request_path, body=""):
+def create_signature(timestamp, method, path, body=""):
 
-    message = f"{timestamp}{method}{request_path}{body}"
+    message = f"{timestamp}{method}{path}{body}"
 
-    return base64.b64encode(
+    signature = base64.b64encode(
         hmac.new(
             API_SECRET.encode("utf-8"),
             message.encode("utf-8"),
             hashlib.sha256
         ).digest()
     ).decode()
+
+    return signature
 
 # =====================================================
 # HEADERS
@@ -48,7 +50,12 @@ def get_headers(method, path, body=""):
 
     return {
         "ACCESS-KEY": API_KEY,
-        "ACCESS-SIGN": create_signature(timestamp, method, path, body),
+        "ACCESS-SIGN": create_signature(
+            timestamp,
+            method,
+            path,
+            body
+        ),
         "ACCESS-TIMESTAMP": timestamp,
         "ACCESS-PASSPHRASE": PASSPHRASE,
         "Content-Type": "application/json",
@@ -56,7 +63,7 @@ def get_headers(method, path, body=""):
     }
 
 # =====================================================
-# POSIÇÃO REAL
+# POSICAO REAL BITGET
 # =====================================================
 
 def get_real_position(symbol):
@@ -86,16 +93,16 @@ def get_real_position(symbol):
 
         for pos in positions:
 
-            side = str(
-                pos.get("posSide", "")
-            ).lower()
-
             qty = float(
                 pos.get("total", "0")
             )
 
             if qty <= 0:
                 continue
+
+            side = str(
+                pos.get("posSide", "")
+            ).lower()
 
             if side == "long":
                 return "LONG"
@@ -108,14 +115,14 @@ def get_real_position(symbol):
     except Exception as e:
 
         print(
-            f"POSITION ERROR: {e}",
+            f"GET POSITION ERROR: {e}",
             flush=True
         )
 
         return "FLAT"
 
 # =====================================================
-# PLACE ORDER
+# ABRIR ORDEM
 # =====================================================
 
 def place_order(symbol, side):
@@ -134,7 +141,11 @@ def place_order(symbol, side):
 
     response = requests.post(
         BASE_URL + path,
-        headers=get_headers("POST", path, body_json),
+        headers=get_headers(
+            "POST",
+            path,
+            body_json
+        ),
         data=body_json,
         timeout=20
     )
@@ -142,7 +153,7 @@ def place_order(symbol, side):
     return response.json()
 
 # =====================================================
-# CLOSE POSITION
+# FECHAR POSICAO
 # =====================================================
 
 def close_position(symbol, pos_side):
@@ -159,7 +170,11 @@ def close_position(symbol, pos_side):
 
     response = requests.post(
         BASE_URL + path,
-        headers=get_headers("POST", path, body_json),
+        headers=get_headers(
+            "POST",
+            path,
+            body_json
+        ),
         data=body_json,
         timeout=20
     )
@@ -167,7 +182,22 @@ def close_position(symbol, pos_side):
     return response.json()
 
 # =====================================================
-# POSITIONS ENDPOINT
+# HOME
+# =====================================================
+
+@app.route("/")
+def home():
+
+    return jsonify({
+        "status": "MONSTER LIVE",
+        "trade_qty": TRADE_QTY,
+        "api_key": bool(API_KEY),
+        "secret": bool(API_SECRET),
+        "passphrase": bool(PASSPHRASE)
+    })
+
+# =====================================================
+# POSICOES
 # =====================================================
 
 @app.route("/uta-positions")
@@ -175,7 +205,10 @@ def uta_positions():
 
     try:
 
-        path = "/api/v3/position/current-position?category=USDT-FUTURES"
+        path = (
+            "/api/v3/position/current-position"
+            "?category=USDT-FUTURES"
+        )
 
         response = requests.get(
             BASE_URL + path,
@@ -193,21 +226,6 @@ def uta_positions():
         }), 500
 
 # =====================================================
-# HOME
-# =====================================================
-
-@app.route("/")
-def home():
-
-    return jsonify({
-        "status": "MONSTER UTA V3 LIVE",
-        "trade_qty": TRADE_QTY,
-        "api_key": bool(API_KEY),
-        "secret": bool(API_SECRET),
-        "passphrase": bool(PASSPHRASE)
-    })
-
-# =====================================================
 # WEBHOOK
 # =====================================================
 
@@ -218,13 +236,9 @@ def webhook():
 
     if not data:
 
-        print(
-            "IGNORED EMPTY PAYLOAD",
-            flush=True
-        )
-
         return jsonify({
-            "ignored": True
+            "ignored": True,
+            "reason": "empty_payload"
         }), 200
 
     action = data.get("action")
@@ -238,15 +252,15 @@ def webhook():
         f"[{datetime.now()}] "
         f"ACTION={action} "
         f"SYMBOL={symbol} "
-        f"REAL_POSITION={current_position}",
+        f"POSITION={current_position}",
         flush=True
     )
 
     try:
 
-        # ==========================================
+        # =================================================
         # LONG
-        # ==========================================
+        # =================================================
 
         if action == "LONG":
 
@@ -257,14 +271,23 @@ def webhook():
                     "reason": "already_long"
                 })
 
+            if current_position == "SHORT":
+
+                close_position(
+                    symbol,
+                    "short"
+                )
+
+                time.sleep(1)
+
             result = place_order(
-                symbol=symbol,
-                side="buy"
+                symbol,
+                "buy"
             )
 
-        # ==========================================
+        # =================================================
         # SHORT
-        # ==========================================
+        # =================================================
 
         elif action == "SHORT":
 
@@ -275,14 +298,23 @@ def webhook():
                     "reason": "already_short"
                 })
 
+            if current_position == "LONG":
+
+                close_position(
+                    symbol,
+                    "long"
+                )
+
+                time.sleep(1)
+
             result = place_order(
-                symbol=symbol,
-                side="sell"
+                symbol,
+                "sell"
             )
 
-        # ==========================================
+        # =================================================
         # EXIT LONG
-        # ==========================================
+        # =================================================
 
         elif action == "EXIT_LONG":
 
@@ -294,13 +326,13 @@ def webhook():
                 })
 
             result = close_position(
-                symbol=symbol,
-                pos_side="long"
+                symbol,
+                "long"
             )
 
-        # ==========================================
+        # =================================================
         # EXIT SHORT
-        # ==========================================
+        # =================================================
 
         elif action == "EXIT_SHORT":
 
@@ -312,15 +344,15 @@ def webhook():
                 })
 
             result = close_position(
-                symbol=symbol,
-                pos_side="short"
+                symbol,
+                "short"
             )
 
         else:
 
             return jsonify({
                 "success": False,
-                "error": "unknown action"
+                "error": "unknown_action"
             }), 400
 
         print(result, flush=True)
@@ -331,7 +363,7 @@ def webhook():
             "success": True,
             "action": action,
             "symbol": symbol,
-            "real_position_before": current_position,
+            "position_before": current_position,
             "result": result
         })
 
@@ -352,6 +384,7 @@ def webhook():
 # =====================================================
 
 if __name__ == "__main__":
+
     app.run(
         host="0.0.0.0",
         port=8080
