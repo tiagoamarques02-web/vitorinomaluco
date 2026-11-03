@@ -20,7 +20,9 @@ PASSPHRASE = os.getenv("BITGET_PASSPHRASE")
 
 BASE_URL = "https://api.bitget.com"
 
-TRADE_QTY = "0.25"
+TRADE_QTY = "0.10"
+
+CURRENT_POSITION = "FLAT"
 
 # =====================================================
 # SIGNATURE
@@ -108,7 +110,7 @@ def close_position(symbol, pos_side):
     return response.json()
 
 # =====================================================
-# CURRENT POSITIONS
+# GET POSITIONS
 # =====================================================
 
 def get_positions():
@@ -135,7 +137,8 @@ def home():
         "api_key": bool(API_KEY),
         "secret": bool(API_SECRET),
         "passphrase": bool(PASSPHRASE),
-        "trade_qty": TRADE_QTY
+        "trade_qty": TRADE_QTY,
+        "current_position": CURRENT_POSITION
     })
 
 # =====================================================
@@ -156,103 +159,13 @@ def uta_positions():
         }), 500
 
 # =====================================================
-# BUY TEST
-# =====================================================
-
-@app.route("/uta-buy-test")
-def uta_buy_test():
-
-    try:
-
-        result = place_order(
-            symbol="ZECUSDT",
-            side="buy"
-        )
-
-        return jsonify(result)
-
-    except Exception as e:
-
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
-# =====================================================
-# SELL TEST
-# =====================================================
-
-@app.route("/uta-sell-test")
-def uta_sell_test():
-
-    try:
-
-        result = place_order(
-            symbol="ZECUSDT",
-            side="sell"
-        )
-
-        return jsonify(result)
-
-    except Exception as e:
-
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
-# =====================================================
-# CLOSE LONG TEST
-# =====================================================
-
-@app.route("/uta-close-long")
-def uta_close_long():
-
-    try:
-
-        result = close_position(
-            symbol="ZECUSDT",
-            pos_side="long"
-        )
-
-        return jsonify(result)
-
-    except Exception as e:
-
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
-# =====================================================
-# CLOSE SHORT TEST
-# =====================================================
-
-@app.route("/uta-close-short")
-def uta_close_short():
-
-    try:
-
-        result = close_position(
-            symbol="ZECUSDT",
-            pos_side="short"
-        )
-
-        return jsonify(result)
-
-    except Exception as e:
-
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
-# =====================================================
-# TRADINGVIEW WEBHOOK
+# WEBHOOK
 # =====================================================
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+
+    global CURRENT_POSITION
 
     data = request.get_json(silent=True)
 
@@ -266,49 +179,98 @@ def webhook():
 
     action = data.get("action")
     symbol = data.get("symbol")
-    price = data.get("price")
-    timeframe = data.get("timeframe")
 
-    print("=" * 70, flush=True)
+    print("=" * 80, flush=True)
 
     print(
         f"[{datetime.now()}] "
         f"ACTION={action} "
         f"SYMBOL={symbol} "
-        f"PRICE={price} "
-        f"TIMEFRAME={timeframe}",
+        f"CURRENT_POSITION={CURRENT_POSITION}",
         flush=True
     )
 
     try:
 
+        # =====================================================
+        # LONG
+        # =====================================================
+
         if action == "LONG":
+
+            if CURRENT_POSITION == "LONG":
+
+                return jsonify({
+                    "ignored": True,
+                    "reason": "already_long"
+                })
 
             result = place_order(
                 symbol=symbol,
                 side="buy"
             )
 
+            CURRENT_POSITION = "LONG"
+
+        # =====================================================
+        # SHORT
+        # =====================================================
+
         elif action == "SHORT":
+
+            if CURRENT_POSITION == "SHORT":
+
+                return jsonify({
+                    "ignored": True,
+                    "reason": "already_short"
+                })
 
             result = place_order(
                 symbol=symbol,
                 side="sell"
             )
 
+            CURRENT_POSITION = "SHORT"
+
+        # =====================================================
+        # EXIT LONG
+        # =====================================================
+
         elif action == "EXIT_LONG":
+
+            if CURRENT_POSITION != "LONG":
+
+                return jsonify({
+                    "ignored": True,
+                    "reason": "no_long_position"
+                })
 
             result = close_position(
                 symbol=symbol,
                 pos_side="long"
             )
 
+            CURRENT_POSITION = "FLAT"
+
+        # =====================================================
+        # EXIT SHORT
+        # =====================================================
+
         elif action == "EXIT_SHORT":
+
+            if CURRENT_POSITION != "SHORT":
+
+                return jsonify({
+                    "ignored": True,
+                    "reason": "no_short_position"
+                })
 
             result = close_position(
                 symbol=symbol,
                 pos_side="short"
             )
+
+            CURRENT_POSITION = "FLAT"
 
         else:
 
@@ -319,12 +281,18 @@ def webhook():
 
         print(result, flush=True)
 
-        print("=" * 70, flush=True)
+        print(
+            f"NEW_POSITION={CURRENT_POSITION}",
+            flush=True
+        )
+
+        print("=" * 80, flush=True)
 
         return jsonify({
             "success": True,
             "action": action,
             "symbol": symbol,
+            "position": CURRENT_POSITION,
             "result": result
         })
 
