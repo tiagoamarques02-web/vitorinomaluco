@@ -63,7 +63,7 @@ def get_headers(method, path, body=""):
     }
 
 # =====================================================
-# POSICAO REAL BITGET
+# POSIÇÃO REAL BITGET
 # =====================================================
 
 def get_real_position(symbol):
@@ -85,7 +85,7 @@ def get_real_position(symbol):
 
         positions = (
             data.get("data", {})
-                .get("list")
+                .get("list", [])
         )
 
         if not positions:
@@ -122,6 +122,25 @@ def get_real_position(symbol):
         return "FLAT"
 
 # =====================================================
+# ESPERAR FECHO TOTAL
+# =====================================================
+
+def wait_flat(symbol, timeout=20):
+
+    start = time.time()
+
+    while time.time() - start < timeout:
+
+        current = get_real_position(symbol)
+
+        if current == "FLAT":
+            return True
+
+        time.sleep(1)
+
+    return False
+
+# =====================================================
 # ABRIR ORDEM
 # =====================================================
 
@@ -137,7 +156,10 @@ def place_order(symbol, side):
         "qty": TRADE_QTY
     }
 
-    body_json = json.dumps(body)
+    body_json = json.dumps(
+        body,
+        separators=(",", ":")
+    )
 
     response = requests.post(
         BASE_URL + path,
@@ -153,7 +175,7 @@ def place_order(symbol, side):
     return response.json()
 
 # =====================================================
-# FECHAR POSICAO
+# FECHAR POSIÇÃO
 # =====================================================
 
 def close_position(symbol, pos_side):
@@ -166,7 +188,10 @@ def close_position(symbol, pos_side):
         "posSide": pos_side
     }
 
-    body_json = json.dumps(body)
+    body_json = json.dumps(
+        body,
+        separators=(",", ":")
+    )
 
     response = requests.post(
         BASE_URL + path,
@@ -197,7 +222,7 @@ def home():
     })
 
 # =====================================================
-# POSICOES
+# POSIÇÕES
 # =====================================================
 
 @app.route("/uta-positions")
@@ -212,11 +237,16 @@ def uta_positions():
 
         response = requests.get(
             BASE_URL + path,
-            headers=get_headers("GET", path),
+            headers=get_headers(
+                "GET",
+                path
+            ),
             timeout=20
         )
 
-        return jsonify(response.json())
+        return jsonify(
+            response.json()
+        )
 
     except Exception as e:
 
@@ -243,6 +273,13 @@ def webhook():
 
     action = data.get("action")
     symbol = data.get("symbol")
+
+    if not symbol:
+
+        return jsonify({
+            "success": False,
+            "error": "missing_symbol"
+        }), 400
 
     current_position = get_real_position(symbol)
 
@@ -278,7 +315,12 @@ def webhook():
                     "short"
                 )
 
-                time.sleep(1)
+                if not wait_flat(symbol):
+
+                    return jsonify({
+                        "success": False,
+                        "error": "timeout_waiting_short_close"
+                    }), 500
 
             result = place_order(
                 symbol,
@@ -305,7 +347,12 @@ def webhook():
                     "long"
                 )
 
-                time.sleep(1)
+                if not wait_flat(symbol):
+
+                    return jsonify({
+                        "success": False,
+                        "error": "timeout_waiting_long_close"
+                    }), 500
 
             result = place_order(
                 symbol,
@@ -356,7 +403,6 @@ def webhook():
             }), 400
 
         print(result, flush=True)
-
         print("=" * 80, flush=True)
 
         return jsonify({
