@@ -9,7 +9,6 @@ app = Flask(__name__)
 # =====================================================
 
 DRY_RUN = True
-
 TRADE_QTY = "0.01"
 
 # =====================================================
@@ -23,7 +22,6 @@ SIM_POSITION = "FLAT"
 # =====================================================
 
 def get_real_position(symbol):
-
     global SIM_POSITION
 
     print(
@@ -38,7 +36,6 @@ def get_real_position(symbol):
 # =====================================================
 
 def place_order(symbol, side):
-
     global SIM_POSITION
 
     if side == "buy":
@@ -66,7 +63,6 @@ def place_order(symbol, side):
 # =====================================================
 
 def close_position(symbol, pos_side):
-
     global SIM_POSITION
 
     SIM_POSITION = "FLAT"
@@ -100,6 +96,20 @@ def home():
     })
 
 # =====================================================
+# HEALTH
+# =====================================================
+
+@app.route("/health")
+def health():
+
+    return jsonify({
+        "status": "ok",
+        "dry_run": True,
+        "position": SIM_POSITION,
+        "timestamp": str(datetime.now())
+    })
+
+# =====================================================
 # POSITION STATUS
 # =====================================================
 
@@ -123,6 +133,11 @@ def webhook():
 
     data = request.get_json(silent=True)
 
+    print("=" * 80, flush=True)
+    print("RAW PAYLOAD:", flush=True)
+    print(data, flush=True)
+    print("=" * 80, flush=True)
+
     if not data:
 
         return jsonify({
@@ -134,7 +149,9 @@ def webhook():
         data.get("action", "")
     ).upper()
 
-    symbol = data.get("symbol")
+    symbol = str(
+        data.get("symbol", "")
+    ).upper()
 
     if not symbol:
 
@@ -148,7 +165,7 @@ def webhook():
     print("=" * 80, flush=True)
 
     print(
-        f"[{datetime.now()}] "
+        f"[{datetime.utcnow()} UTC] "
         f"ACTION={action} "
         f"SYMBOL={symbol} "
         f"POSITION={current_position}",
@@ -275,20 +292,6 @@ def webhook():
             "success": False,
             "error": str(e)
         }), 500
-
-# =====================================================
-# HEALTH
-# =====================================================
-
-@app.route("/health")
-def health():
-
-    return jsonify({
-        "status": "ok",
-        "dry_run": True,
-        "position": SIM_POSITION,
-        "timestamp": str(datetime.now())
-    })
 
 # =====================================================
 # START
