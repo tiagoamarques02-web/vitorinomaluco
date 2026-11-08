@@ -1,12 +1,6 @@
 from flask import Flask, request, jsonify
 from datetime import datetime
-import hashlib
-import hmac
-import base64
-import json
-import time
 import os
-import requests
 
 app = Flask(__name__)
 
@@ -14,197 +8,82 @@ app = Flask(__name__)
 # CONFIG
 # =====================================================
 
-API_KEY = os.getenv("BITGET_API_KEY")
-API_SECRET = os.getenv("BITGET_API_SECRET")
-PASSPHRASE = os.getenv("BITGET_PASSPHRASE")
-
-BASE_URL = "https://api.bitget.com"
+DRY_RUN = True
 
 TRADE_QTY = "0.01"
 
 # =====================================================
-# SIGNATURE
+# ESTADO SIMULADO
 # =====================================================
 
-def create_signature(timestamp, method, path, body=""):
-
-    message = f"{timestamp}{method}{path}{body}"
-
-    signature = base64.b64encode(
-        hmac.new(
-            API_SECRET.encode("utf-8"),
-            message.encode("utf-8"),
-            hashlib.sha256
-        ).digest()
-    ).decode()
-
-    return signature
+SIM_POSITION = "FLAT"
 
 # =====================================================
-# HEADERS
-# =====================================================
-
-def get_headers(method, path, body=""):
-
-    timestamp = str(int(time.time() * 1000))
-
-    return {
-        "ACCESS-KEY": API_KEY,
-        "ACCESS-SIGN": create_signature(
-            timestamp,
-            method,
-            path,
-            body
-        ),
-        "ACCESS-TIMESTAMP": timestamp,
-        "ACCESS-PASSPHRASE": PASSPHRASE,
-        "Content-Type": "application/json",
-        "locale": "en-US"
-    }
-
-# =====================================================
-# POSIÇÃO REAL BITGET
+# POSITION
 # =====================================================
 
 def get_real_position(symbol):
 
-    try:
+    global SIM_POSITION
 
-        path = (
-            "/api/v3/position/current-position"
-            f"?category=USDT-FUTURES&symbol={symbol}"
-        )
+    print(
+        f"[DRY RUN] POSITION CHECK {symbol} -> {SIM_POSITION}",
+        flush=True
+    )
 
-        response = requests.get(
-            BASE_URL + path,
-            headers=get_headers("GET", path),
-            timeout=20
-        )
-
-        data = response.json()
-
-        positions = (
-            data.get("data", {})
-                .get("list", [])
-        )
-
-        if not positions:
-            return "FLAT"
-
-        for pos in positions:
-
-            qty = float(
-                pos.get("total", "0")
-            )
-
-            if qty <= 0:
-                continue
-
-            side = str(
-                pos.get("posSide", "")
-            ).lower()
-
-            if side == "long":
-                return "LONG"
-
-            if side == "short":
-                return "SHORT"
-
-        return "FLAT"
-
-    except Exception as e:
-
-        print(
-            f"GET POSITION ERROR: {e}",
-            flush=True
-        )
-
-        return "FLAT"
+    return SIM_POSITION
 
 # =====================================================
-# ESPERAR FECHO TOTAL
-# =====================================================
-
-def wait_flat(symbol, timeout=20):
-
-    start = time.time()
-
-    while time.time() - start < timeout:
-
-        current = get_real_position(symbol)
-
-        if current == "FLAT":
-            return True
-
-        time.sleep(1)
-
-    return False
-
-# =====================================================
-# ABRIR ORDEM
+# PLACE ORDER
 # =====================================================
 
 def place_order(symbol, side):
 
-    path = "/api/v3/trade/place-order"
+    global SIM_POSITION
 
-    body = {
-        "category": "USDT-FUTURES",
+    if side == "buy":
+        SIM_POSITION = "LONG"
+
+    elif side == "sell":
+        SIM_POSITION = "SHORT"
+
+    result = {
+        "success": True,
+        "dry_run": True,
+        "operation": "OPEN",
         "symbol": symbol,
         "side": side,
-        "orderType": "market",
-        "qty": TRADE_QTY
+        "position_after": SIM_POSITION,
+        "timestamp": str(datetime.now())
     }
 
-    body_json = json.dumps(
-        body,
-        separators=(",", ":")
-    )
+    print(result, flush=True)
 
-    response = requests.post(
-        BASE_URL + path,
-        headers=get_headers(
-            "POST",
-            path,
-            body_json
-        ),
-        data=body_json,
-        timeout=20
-    )
-
-    return response.json()
+    return result
 
 # =====================================================
-# FECHAR POSIÇÃO
+# CLOSE POSITION
 # =====================================================
 
 def close_position(symbol, pos_side):
 
-    path = "/api/v3/trade/close-positions"
+    global SIM_POSITION
 
-    body = {
-        "category": "USDT-FUTURES",
+    SIM_POSITION = "FLAT"
+
+    result = {
+        "success": True,
+        "dry_run": True,
+        "operation": "CLOSE",
         "symbol": symbol,
-        "posSide": pos_side
+        "posSide": pos_side,
+        "position_after": SIM_POSITION,
+        "timestamp": str(datetime.now())
     }
 
-    body_json = json.dumps(
-        body,
-        separators=(",", ":")
-    )
+    print(result, flush=True)
 
-    response = requests.post(
-        BASE_URL + path,
-        headers=get_headers(
-            "POST",
-            path,
-            body_json
-        ),
-        data=body_json,
-        timeout=20
-    )
-
-    return response.json()
+    return result
 
 # =====================================================
 # HOME
@@ -214,46 +93,24 @@ def close_position(symbol, pos_side):
 def home():
 
     return jsonify({
-        "status": "MONSTER LIVE",
+        "status": "MONSTER DRY RUN",
+        "dry_run": DRY_RUN,
         "trade_qty": TRADE_QTY,
-        "api_key": bool(API_KEY),
-        "secret": bool(API_SECRET),
-        "passphrase": bool(PASSPHRASE)
+        "simulated_position": SIM_POSITION
     })
 
 # =====================================================
-# POSIÇÕES
+# POSITION STATUS
 # =====================================================
 
 @app.route("/uta-positions")
 def uta_positions():
 
-    try:
-
-        path = (
-            "/api/v3/position/current-position"
-            "?category=USDT-FUTURES"
-        )
-
-        response = requests.get(
-            BASE_URL + path,
-            headers=get_headers(
-                "GET",
-                path
-            ),
-            timeout=20
-        )
-
-        return jsonify(
-            response.json()
-        )
-
-    except Exception as e:
-
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+    return jsonify({
+        "success": True,
+        "dry_run": True,
+        "position": SIM_POSITION
+    })
 
 # =====================================================
 # WEBHOOK
@@ -261,6 +118,8 @@ def uta_positions():
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+
+    global SIM_POSITION
 
     data = request.get_json(silent=True)
 
@@ -271,7 +130,10 @@ def webhook():
             "reason": "empty_payload"
         }), 200
 
-    action = data.get("action")
+    action = str(
+        data.get("action", "")
+    ).upper()
+
     symbol = data.get("symbol")
 
     if not symbol:
@@ -315,13 +177,6 @@ def webhook():
                     "short"
                 )
 
-                if not wait_flat(symbol):
-
-                    return jsonify({
-                        "success": False,
-                        "error": "timeout_waiting_short_close"
-                    }), 500
-
             result = place_order(
                 symbol,
                 "buy"
@@ -347,13 +202,6 @@ def webhook():
                     "long"
                 )
 
-                if not wait_flat(symbol):
-
-                    return jsonify({
-                        "success": False,
-                        "error": "timeout_waiting_long_close"
-                    }), 500
-
             result = place_order(
                 symbol,
                 "sell"
@@ -363,7 +211,7 @@ def webhook():
         # EXIT LONG
         # =================================================
 
-        elif action == "EXIT_LONG":
+        elif action in ["EXIT_LONG", "LX"]:
 
             if current_position != "LONG":
 
@@ -381,7 +229,7 @@ def webhook():
         # EXIT SHORT
         # =================================================
 
-        elif action == "EXIT_SHORT":
+        elif action in ["EXIT_SHORT", "SX"]:
 
             if current_position != "SHORT":
 
@@ -399,7 +247,8 @@ def webhook():
 
             return jsonify({
                 "success": False,
-                "error": "unknown_action"
+                "error": "unknown_action",
+                "received": action
             }), 400
 
         print(result, flush=True)
@@ -407,9 +256,11 @@ def webhook():
 
         return jsonify({
             "success": True,
+            "dry_run": True,
             "action": action,
             "symbol": symbol,
             "position_before": current_position,
+            "position_after": SIM_POSITION,
             "result": result
         })
 
@@ -426,6 +277,20 @@ def webhook():
         }), 500
 
 # =====================================================
+# HEALTH
+# =====================================================
+
+@app.route("/health")
+def health():
+
+    return jsonify({
+        "status": "ok",
+        "dry_run": True,
+        "position": SIM_POSITION,
+        "timestamp": str(datetime.now())
+    })
+
+# =====================================================
 # START
 # =====================================================
 
@@ -433,5 +298,5 @@ if __name__ == "__main__":
 
     app.run(
         host="0.0.0.0",
-        port=8080
+        port=int(os.environ.get("PORT", 8080))
     )
